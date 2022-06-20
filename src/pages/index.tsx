@@ -66,11 +66,12 @@ const Index: NextPage = () => {
 
     Pusher.logToConsole = false;
     const channel = pusher.subscribe("channel");
-
+    // should determinates who's the sender
+    // use cleanup also, and renegotiate if the network changes
     channel.bind("channel-event", async (data: channelEvent) => {
       if (data.sender === myid) return;
-      console.log("event-pusher:", data.type);
-      console.log(localeStream, remoteStream);
+      // console.log("event-pusher:", data.type);
+      // console.log(localeStream, remoteStream);
       // if message candidate add candidate peerConnection.addCandidate(candidate)
       if (data.type === "candidate") {
         addCandidate(JSON.parse(data.payload));

@@ -117,9 +117,7 @@ export function useWebRTC(props: useWebRTCProps) {
     let _offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(_offer);
     setOffer(_offer);
-    // SHOULD SEND OFFER BEFORE THEN WAIT ICE!!!!!!!...???? I GUESS MAKE A LOGIC
-    // await waitForIceGatheringState(peerConnection!, ["complete"]);
-    // console.log("waiting for gathering");
+
     return _offer;
   };
 
