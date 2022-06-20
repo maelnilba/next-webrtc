@@ -28,8 +28,9 @@ const Index: NextPage = () => {
     setLocaleStream(_localeStream);
   };
 
-  const createOffer = async () => {
-    if (!localeStream || !peerConnection) return;
+  const createPeerConnection = async (type: "offer" | "answer") => {
+    if (!peerConnection) return;
+    if (!localeStream) return;
     let _remoteStream = new MediaStream();
     remoteStreamRef.current!.srcObject = _remoteStream;
 
@@ -43,18 +44,42 @@ const Index: NextPage = () => {
       });
     };
 
+    setRemoteStream(_remoteStream);
+
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
-        setOffer(JSON.stringify(peerConnection.localDescription));
+        type === "offer"
+          ? setOffer(JSON.stringify(peerConnection.localDescription))
+          : setAnswer(JSON.stringify(peerConnection.localDescription));
       }
     };
+  };
+
+  const createOffer = async () => {
+    await createPeerConnection("offer");
 
     let offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(offer);
-    setRemoteStream(_remoteStream);
     setOffer(JSON.stringify(offer));
   };
 
+  const createAnswer = async () => {
+    await createPeerConnection("answer");
+
+    if (!offer) return;
+    await peerConnection!.setRemoteDescription(JSON.parse(offer));
+
+    let _answer = await peerConnection!.createAnswer();
+    await peerConnection!.setLocalDescription(_answer);
+    setAnswer(JSON.stringify(_answer));
+  };
+
+  const addAnswer = async () => {
+    if (!answer) return;
+    if (!peerConnection?.currentRemoteDescription) {
+      peerConnection?.setRemoteDescription(JSON.parse(answer));
+    }
+  };
   useEffect(() => {
     init();
   }, []);
@@ -62,18 +87,22 @@ const Index: NextPage = () => {
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-center bg-blue-300">
       <div className="flex w-screen flex-row justify-around ">
-        <video
-          className="m-12 border border-stone-300 bg-blue-400"
-          ref={localeStreamRef}
-          autoPlay
-          playsInline
-        ></video>
-        <video
-          ref={remoteStreamRef}
-          className=" m-12 border border-stone-300  bg-blue-400"
-          autoPlay
-          playsInline
-        ></video>
+        <div className="w-auto">
+          <video
+            className="border border-stone-300 bg-blue-400"
+            ref={localeStreamRef}
+            autoPlay
+            playsInline
+          ></video>
+        </div>
+        <div className="w-auto">
+          <video
+            ref={remoteStreamRef}
+            className="border border-stone-300  bg-blue-400"
+            autoPlay
+            playsInline
+          ></video>
+        </div>
       </div>
       <div className="flex w-full flex-col space-y-2  px-4">
         <button
@@ -82,12 +111,24 @@ const Index: NextPage = () => {
         >
           Create offer
         </button>
-        <textarea value={offer} onChange={() => {}}></textarea>
-        <button className="rounded-xl bg-blue-200 p-2 text-2xl text-black">
+        <textarea
+          value={offer}
+          onChange={(e) => setOffer(e.target.value)}
+        ></textarea>
+        <button
+          className="rounded-xl bg-blue-200 p-2 text-2xl text-black"
+          onClick={createAnswer}
+        >
           Create answer
         </button>
-        <textarea onChange={() => {}} value={answer}></textarea>
-        <button className="rounded-xl bg-blue-200 p-2 text-2xl text-black">
+        <textarea
+          onChange={(e) => setAnswer(e.target.value)}
+          value={answer}
+        ></textarea>
+        <button
+          className="rounded-xl bg-blue-200 p-2 text-2xl text-black"
+          onClick={addAnswer}
+        >
           add answer
         </button>
       </div>
