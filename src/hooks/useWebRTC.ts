@@ -1,5 +1,19 @@
 import { useEffect, useState } from "react";
 
+interface RTCPeerConnectionEventMap {
+  connectionstatechange: Event;
+  datachannel: RTCDataChannelEvent;
+  icecandidate: RTCPeerConnectionIceEvent;
+  icecandidateerror: Event;
+  iceconnectionstatechange: Event;
+  icegatheringstatechange: Event;
+  negotiationneeded: Event;
+  signalingstatechange: Event;
+  track: RTCTrackEvent;
+}
+
+// https://github.com/web-platform-tests/wpt/blob/master/webrtc/RTCPeerConnection-helper.js#L191
+
 let servers = {
   iceServers: [
     {
@@ -8,18 +22,86 @@ let servers = {
   ],
 };
 
+type RTCConfigType = typeof servers;
+
 type useWebRTCProps = {
-  RTCConfig?: typeof servers;
+  RTCConfig?: RTCConfigType;
   MediaConfig?: MediaStreamConstraints;
-  onIceCandidate: (...args: any[]) => any;
+  onIceCandidate: (...args: any[]) => Promise<any>;
 };
 
-export function useWebRTC(props: useWebRTCProps) {
+type RTCPeerConnectionProps = {
+  RTCConfig: RTCConfigType;
+};
+
+function useRTCPeerConnection(props: RTCPeerConnectionProps) {
   const [peerConnection] = useState(
-    typeof window === "undefined"
+    typeof window !== "undefined"
       ? undefined
-      : new RTCPeerConnection(props.RTCConfig || servers)
+      : new RTCPeerConnection(props.RTCConfig)
   );
+
+  useEffect(() => {
+    if (!peerConnection) return;
+    const iceGatheringStateChange = async () => {
+      console.log("gatheringstate:" + peerConnection.iceGatheringState);
+      if (peerConnection?.iceGatheringState === "complete") {
+        //
+      }
+    };
+
+    const connectionStateChange = async () => {
+      console.log("connectionstatechange:" + peerConnection.connectionState);
+    };
+
+    const signalingState = async () => {
+      console.log("signalingstate" + peerConnection.signalingState);
+    };
+
+    peerConnection.addEventListener(
+      "connectionstatechange",
+      connectionStateChange
+    );
+
+    peerConnection.addEventListener(
+      "icegatheringstatechange",
+      iceGatheringStateChange
+    );
+
+    peerConnection.addEventListener(
+      "icegatheringstatechange",
+      iceGatheringStateChange
+    );
+
+    peerConnection.addEventListener("signalingstatechange", signalingState);
+
+    return () => {
+      if (!peerConnection) return;
+
+      peerConnection.removeEventListener(
+        "icegatheringstatechange",
+        iceGatheringStateChange
+      );
+      peerConnection.removeEventListener(
+        "connectionstatechange",
+        connectionStateChange
+      );
+      peerConnection.removeEventListener(
+        "signalingstatechange",
+        signalingState
+      );
+    };
+  }, [peerConnection]);
+
+  return {
+    peerConnection,
+  };
+}
+
+export function useWebRTC(props: useWebRTCProps) {
+  const { peerConnection } = useRTCPeerConnection({
+    RTCConfig: props.RTCConfig || servers,
+  });
 
   const [localeStream, setLocaleStream] = useState<MediaStream>();
   const [remoteStream, setRemoteStream] = useState<MediaStream>();
@@ -60,7 +142,6 @@ export function useWebRTC(props: useWebRTCProps) {
         });
       };
     } catch (error) {
-      // Other has Logout and try to connect agains
       console.log("happens on:" + type, "localestream:", localeStream);
       throw error;
     }
@@ -72,15 +153,13 @@ export function useWebRTC(props: useWebRTCProps) {
         type === "offer"
           ? setOffer(peerConnection.localDescription!)
           : setAnswer(peerConnection.localDescription!);
-
-        props.onIceCandidate(JSON.stringify(event.candidate));
+        await props.onIceCandidate(JSON.stringify(event.candidate));
       }
     };
   };
 
   const createOffer = async () => {
     await createPeerConnection({ type: "offer" });
-
     let _offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(_offer);
     setOffer(_offer);
@@ -133,8 +212,13 @@ export function useWebRTC(props: useWebRTCProps) {
     }
   };
 
+  const streamDisconnect = () => {
+    console.log("Triggering stream disconnect");
+  };
+
   return {
     initLocaleStream,
+    streamDisconnect,
     localeStream,
     remoteStream,
     offer,

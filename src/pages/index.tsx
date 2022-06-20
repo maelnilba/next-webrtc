@@ -16,8 +16,8 @@ let servers = {
 const Index: NextPage = () => {
   const [myid, setMyid] = useState((Math.random() * 1000).toString());
   const isMounted = useRef(false);
-  const fetchPusher = ({ payload, sender, type }: channelEvent) => {
-    fetch("api/pusher", {
+  const fetchPusher = async ({ payload, sender, type }: channelEvent) => {
+    await fetch("api/pusher", {
       method: "POST",
       headers: {
         Accept: "application/json",
@@ -31,10 +31,11 @@ const Index: NextPage = () => {
     });
   };
 
-  const onCandidate = (candidate: string) => {
-    fetchPusher({ type: "candidate", payload: candidate, sender: myid });
+  const onCandidate = async (candidate: string) => {
+    await fetchPusher({ type: "candidate", payload: candidate, sender: myid });
   };
   const {
+    streamDisconnect,
     initLocaleStream,
     localeStream,
     remoteStream,
@@ -67,6 +68,9 @@ const Index: NextPage = () => {
     channel.bind("channel-event", async (data: channelEvent) => {
       if (data.sender === myid) return;
       console.log(data.type);
+      if (data.type === "disconnect") {
+        streamDisconnect();
+      }
       // if message candidate add candidate peerConnection.addCandidate(candidate)
       if (data.type === "candidate") {
         addCandidate(JSON.parse(data.payload));
@@ -127,34 +131,6 @@ const Index: NextPage = () => {
       <div className="flex w-screen flex-row justify-around ">
         {localeStream && <VideoRTC stream={localeStream} />}
         {remoteStream && <VideoRTC stream={remoteStream} />}
-      </div>
-      <div className="flex w-full flex-col space-y-2  px-4">
-        <button
-          className="rounded-xl bg-blue-200 p-2 text-2xl text-black"
-          onClick={createOffer}
-        >
-          Create offer
-        </button>
-        <textarea
-          value={JSON.stringify(offer)}
-          onChange={(e) => setOffer(JSON.parse(e.target.value))}
-        ></textarea>
-        <button
-          className="rounded-xl bg-blue-200 p-2 text-2xl text-black"
-          onClick={() => createAnswer()}
-        >
-          Create answer
-        </button>
-        <textarea
-          onChange={(e) => setAnswer(JSON.parse(e.target.value))}
-          value={JSON.stringify(answer)}
-        ></textarea>
-        <button
-          className="rounded-xl bg-blue-200 p-2 text-2xl text-black"
-          onClick={() => addAnswer()}
-        >
-          add answer
-        </button>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@ export const pusher = new Pusher({
 });
 
 const channelEventSchema = z.object({
-  type: z.string().regex(/offer|answer|candidate|join|accept/g),
+  type: z.string().regex(/offer|answer|candidate|join|accept|disconnect/g),
   payload: z.string(),
   sender: z.string().min(1),
 });
