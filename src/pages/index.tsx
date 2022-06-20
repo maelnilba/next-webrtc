@@ -28,7 +28,11 @@ const Index: NextPage = () => {
     setLocaleStream(_localeStream);
   };
 
-  const createPeerConnection = async (type: "offer" | "answer") => {
+  const createPeerConnection = async ({
+    type,
+  }: {
+    type: "answer" | "offer";
+  }) => {
     if (!peerConnection) return;
     if (!localeStream) return;
     let _remoteStream = new MediaStream();
@@ -56,7 +60,7 @@ const Index: NextPage = () => {
   };
 
   const createOffer = async () => {
-    await createPeerConnection("offer");
+    await createPeerConnection({ type: "offer" });
 
     let offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(offer);
@@ -64,7 +68,7 @@ const Index: NextPage = () => {
   };
 
   const createAnswer = async () => {
-    await createPeerConnection("answer");
+    await createPeerConnection({ type: "answer" });
 
     if (!offer) return;
     await peerConnection!.setRemoteDescription(JSON.parse(offer));
