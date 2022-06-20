@@ -35,6 +35,7 @@ const Index: NextPage = () => {
     await fetchPusher({ type: "candidate", payload: candidate, sender: myid });
   };
   const {
+    peerConnection,
     streamDisconnect,
     initLocaleStream,
     localeStream,
@@ -47,6 +48,7 @@ const Index: NextPage = () => {
     addAnswer,
     setAnswer,
     addCandidate,
+    peerConnectionStates,
   } = useWebRTC({ onIceCandidate: onCandidate });
 
   // get id by users
@@ -67,10 +69,8 @@ const Index: NextPage = () => {
 
     channel.bind("channel-event", async (data: channelEvent) => {
       if (data.sender === myid) return;
-      console.log(data.type);
-      if (data.type === "disconnect") {
-        streamDisconnect();
-      }
+      console.log("event-pusher:", data.type);
+      console.log(localeStream, remoteStream);
       // if message candidate add candidate peerConnection.addCandidate(candidate)
       if (data.type === "candidate") {
         addCandidate(JSON.parse(data.payload));
@@ -106,7 +106,6 @@ const Index: NextPage = () => {
       // addanswer when we got a answer type
       if (data.type === "answer") {
         setAnswer(JSON.parse(data.payload));
-        console.log("addAnswer");
         addAnswer(JSON.parse(data.payload));
         fetchPusher({ type: "accept", payload: "accept", sender: myid });
       }
@@ -114,13 +113,14 @@ const Index: NextPage = () => {
       // check if should work
       if (data.type === "accept") {
         console.log("ACCEPTED", localeStream, remoteStream);
+        console.log({ peerConnection });
       }
     });
 
     return () => {
       pusher.unsubscribe("channel");
     };
-  }, [localeStream]);
+  }, [localeStream, remoteStream]);
 
   useEffectOnce(() => {
     initLocaleStream();
@@ -142,6 +142,7 @@ const VideoRTC: React.FC<{ stream: MediaStream }> = ({ stream }) => {
     if (!streamRef.current) return;
     streamRef.current.srcObject = stream;
   }, [streamRef]);
+  // console.log("VideoRTC", stream);
   return (
     <div className="w-auto">
       <video

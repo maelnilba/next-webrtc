@@ -1,16 +1,5 @@
 import { useEffect, useState } from "react";
-
-interface RTCPeerConnectionEventMap {
-  connectionstatechange: Event;
-  datachannel: RTCDataChannelEvent;
-  icecandidate: RTCPeerConnectionIceEvent;
-  icecandidateerror: Event;
-  iceconnectionstatechange: Event;
-  icegatheringstatechange: Event;
-  negotiationneeded: Event;
-  signalingstatechange: Event;
-  track: RTCTrackEvent;
-}
+import { useRTCPeerConnection } from "@hooks/useRTCPeerConnection";
 
 // https://github.com/web-platform-tests/wpt/blob/master/webrtc/RTCPeerConnection-helper.js#L191
 
@@ -30,81 +19,23 @@ type useWebRTCProps = {
   onIceCandidate: (...args: any[]) => Promise<any>;
 };
 
-type RTCPeerConnectionProps = {
-  RTCConfig: RTCConfigType;
-};
-
-function useRTCPeerConnection(props: RTCPeerConnectionProps) {
-  const [peerConnection] = useState(
-    typeof window !== "undefined"
-      ? undefined
-      : new RTCPeerConnection(props.RTCConfig)
-  );
-
-  useEffect(() => {
-    if (!peerConnection) return;
-    const iceGatheringStateChange = async () => {
-      console.log("gatheringstate:" + peerConnection.iceGatheringState);
-      if (peerConnection?.iceGatheringState === "complete") {
-        //
-      }
-    };
-
-    const connectionStateChange = async () => {
-      console.log("connectionstatechange:" + peerConnection.connectionState);
-    };
-
-    const signalingState = async () => {
-      console.log("signalingstate" + peerConnection.signalingState);
-    };
-
-    peerConnection.addEventListener(
-      "connectionstatechange",
-      connectionStateChange
-    );
-
-    peerConnection.addEventListener(
-      "icegatheringstatechange",
-      iceGatheringStateChange
-    );
-
-    peerConnection.addEventListener(
-      "icegatheringstatechange",
-      iceGatheringStateChange
-    );
-
-    peerConnection.addEventListener("signalingstatechange", signalingState);
-
-    return () => {
-      if (!peerConnection) return;
-
-      peerConnection.removeEventListener(
-        "icegatheringstatechange",
-        iceGatheringStateChange
-      );
-      peerConnection.removeEventListener(
-        "connectionstatechange",
-        connectionStateChange
-      );
-      peerConnection.removeEventListener(
-        "signalingstatechange",
-        signalingState
-      );
-    };
-  }, [peerConnection]);
-
-  return {
-    peerConnection,
-  };
-}
-
 export function useWebRTC(props: useWebRTCProps) {
-  const { peerConnection } = useRTCPeerConnection({
+  const {
+    peerConnection,
+    waitForIceGatheringState,
+    connectionState,
+    iceGatheringState,
+    listenToConnected,
+    listenToIceConnected,
+    iceConnectionState,
+    signalingState,
+  } = useRTCPeerConnection({
     RTCConfig: props.RTCConfig || servers,
   });
 
   const [localeStream, setLocaleStream] = useState<MediaStream>();
   const [remoteStream, setRemoteStream] = useState<MediaStream>();
+  const [candidates, setCandidates] = useState<RTCIceCandidateInit[]>([]);
   const [offer, setOffer] = useState<
     RTCSessionDescriptionInit | RTCSessionDescription
   >();
@@ -114,8 +45,10 @@ export function useWebRTC(props: useWebRTCProps) {
 
   const addCandidate = async (candidate: RTCIceCandidateInit) => {
     if (!peerConnection) return;
-    if (peerConnection.currentRemoteDescription === null) return;
-    peerConnection.addIceCandidate(candidate);
+    // if (peerConnection.currentRemoteDescription === null) return;
+    // guess should wait here, put in an queue then add when it's over ?
+    setCandidates((prev) => [...prev, candidate]);
+    // peerConnection.addIceCandidate(candidate);
   };
 
   const createPeerConnection = async ({
@@ -129,24 +62,28 @@ export function useWebRTC(props: useWebRTCProps) {
     if (!localeStream) {
       throw new Error(`localeStream is not defined in ${type}`);
     }
-    let _remoteStream = new MediaStream();
+    if (!remoteStream) {
+      throw new Error(`remoteStream is not defined in ${type}`);
+    }
 
     try {
       localeStream.getTracks().forEach((track) => {
-        peerConnection?.addTrack(track, localeStream);
+        if (peerConnection.connectionState === "new")
+          peerConnection?.addTrack(track, localeStream);
       })!;
+
+      // should add when connectionState = "new"
 
       peerConnection.ontrack = async (event) => {
         event.streams[0]?.getTracks().forEach((track) => {
-          _remoteStream.addTrack(track);
+          if (peerConnection.connectionState === "new")
+            remoteStream.addTrack(track);
         });
       };
     } catch (error) {
       console.log("happens on:" + type, "localestream:", localeStream);
       throw error;
     }
-
-    setRemoteStream(_remoteStream);
 
     peerConnection.onicecandidate = async (event) => {
       if (event.candidate) {
@@ -157,13 +94,32 @@ export function useWebRTC(props: useWebRTCProps) {
       }
     };
   };
+  // Send CreateOffer from Caller (signalling part; custom transport to the other users);
+  // enable PeerConnection.onnegotiationneeded => CreateOffer() only for Caller
+
+  // Callee can be ready with video/audio streams added it to RTCPeerConnection on its side,
+  // then accepts offer and sends answer to Caller (signalling part)
+
+  // Caller gets the answer
+  // and adds the video/audio streams to RTCPeerConnection conditionally when PeerConnection.connectionState == "new",
+  // the tricky parts: condition connectionState == "new" ensures it does not add again as offer / answer
+  // might be exchanged many times with state being connecting etc.
+  // Another is, if you add video/audio streams before this step,
+  // it will be hard to control the ice sdp flowing
+  // and raising errors at wrong states (relates to comment from Benjamin Trent, here) (signalling part)
+
+  // since offer, answer is exchanged, now many ice events flows are exchanged (signalling part)
+
+  // Connection should be established (assuming STUN configured and if peer to peer not possible, TURN required)
 
   const createOffer = async () => {
     await createPeerConnection({ type: "offer" });
     let _offer = await peerConnection!.createOffer();
     await peerConnection!.setLocalDescription(_offer);
     setOffer(_offer);
-
+    // SHOULD SEND OFFER BEFORE THEN WAIT ICE!!!!!!!...???? I GUESS MAKE A LOGIC
+    // await waitForIceGatheringState(peerConnection!, ["complete"]);
+    // console.log("waiting for gathering");
     return _offer;
   };
 
@@ -206,6 +162,7 @@ export function useWebRTC(props: useWebRTCProps) {
         }
       );
       setLocaleStream(_localeStream);
+      setRemoteStream(new MediaStream());
       console.log("init localeStream done");
     } catch (error) {
       console.warn("Unable to get user media", error);
@@ -216,7 +173,25 @@ export function useWebRTC(props: useWebRTCProps) {
     console.log("Triggering stream disconnect");
   };
 
+  useEffect(() => {
+    // should make other than useeffect imo
+    // maybe possible based on offer/answer description if it's in accept or addanswer
+    if (!peerConnection) return;
+    if (!offer && !answer) {
+      console.log("answer:", answer, "offer:", offer);
+      return;
+    }
+    waitForIceGatheringState(peerConnection!, ["complete"]).then(() => {
+      console.log("ice gathering complete");
+      console.log("candidates:", candidates);
+      candidates.forEach((candidate) => {
+        peerConnection.addIceCandidate(candidate);
+      });
+    });
+  }, [answer, offer]);
+
   return {
+    peerConnection,
     initLocaleStream,
     streamDisconnect,
     localeStream,
@@ -229,5 +204,11 @@ export function useWebRTC(props: useWebRTCProps) {
     createAnswer,
     addAnswer,
     addCandidate,
+    peerConnectionStates: {
+      connectionState,
+      iceConnectionState,
+      iceGatheringState,
+      signalingState,
+    },
   };
 }
