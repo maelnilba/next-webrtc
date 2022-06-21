@@ -17,23 +17,25 @@ type useWebRTCProps = {
   RTCConfig?: RTCConfigType;
   MediaConfig?: MediaStreamConstraints;
   onIceCandidate: (...args: any[]) => Promise<any>;
+  localeStream?: MediaStream;
 };
 
 export function useWebRTC(props: useWebRTCProps) {
   const {
     peerConnection,
     waitForIceGatheringState,
+    waitForConnectionStateChange,
     connectionState,
     iceGatheringState,
-    listenToConnected,
-    listenToIceConnected,
     iceConnectionState,
     signalingState,
   } = useRTCPeerConnection({
     RTCConfig: props.RTCConfig || servers,
   });
 
-  const [localeStream, setLocaleStream] = useState<MediaStream>();
+  const [localeStream, setLocaleStream] = useState<MediaStream | undefined>(
+    props.localeStream
+  );
   const [remoteStream, setRemoteStream] = useState<MediaStream>();
   const [candidates, setCandidates] = useState<RTCIceCandidateInit[]>([]);
   const [offer, setOffer] = useState<
@@ -45,8 +47,7 @@ export function useWebRTC(props: useWebRTCProps) {
 
   const addCandidate = async (candidate: RTCIceCandidateInit) => {
     if (!peerConnection) return;
-    // if (peerConnection.currentRemoteDescription === null) return;
-    // guess should wait here, put in an queue then add when it's over ?
+    // add to a queue until states is OK for set them
     setCandidates((prev) => [...prev, candidate]);
     // peerConnection.addIceCandidate(candidate);
   };
@@ -67,21 +68,21 @@ export function useWebRTC(props: useWebRTCProps) {
     }
 
     try {
-      localeStream.getTracks().forEach((track) => {
-        if (peerConnection.connectionState === "new")
-          peerConnection?.addTrack(track, localeStream);
+      localeStream.getTracks().forEach(async (track) => {
+        // if (peerConnection.connectionState === "new")
+        await waitForConnectionStateChange(peerConnection, ["new"]);
+        peerConnection?.addTrack(track, localeStream);
       })!;
 
-      // should add when connectionState = "new"
-
       peerConnection.ontrack = async (event) => {
-        event.streams[0]?.getTracks().forEach((track) => {
-          if (peerConnection.connectionState === "new")
-            remoteStream.addTrack(track);
+        event.streams[0]?.getTracks().forEach(async (track) => {
+          // if (peerConnection.connectionState === "new")
+          await waitForConnectionStateChange(peerConnection, ["new"]);
+          remoteStream.addTrack(track);
         });
       };
     } catch (error) {
-      console.log("happens on:" + type, "localestream:", localeStream);
+      console.log("Peer connection error", { peerConnection });
       throw error;
     }
 
@@ -154,14 +155,19 @@ export function useWebRTC(props: useWebRTCProps) {
 
   const initLocaleStream = async () => {
     try {
-      let _localeStream = await navigator.mediaDevices.getUserMedia(
-        props.MediaConfig || {
-          video: true,
-        }
-      );
+      console.log("states of stream ?", props.localeStream);
+      let _localeStream =
+        props.localeStream ||
+        (await navigator.mediaDevices.getUserMedia(
+          props.MediaConfig || {
+            video: true,
+          }
+        ));
+
+      console.log("The localeStream is set to peer connection");
+
       setLocaleStream(_localeStream);
       setRemoteStream(new MediaStream());
-      console.log("init localeStream done");
     } catch (error) {
       console.warn("Unable to get user media", error);
     }
@@ -172,11 +178,15 @@ export function useWebRTC(props: useWebRTCProps) {
   };
 
   useEffect(() => {
+    if (props.localeStream) setLocaleStream(localeStream);
+  }, [props.localeStream]);
+
+  useEffect(() => {
     // should make other than useeffect imo
     // maybe possible based on offer/answer description if it's in accept or addanswer
     if (!peerConnection) return;
     if (!offer && !answer) {
-      console.log("answer:", answer, "offer:", offer);
+      // console.log("answer:", answer, "offer:", offer);
       return;
     }
     waitForIceGatheringState(peerConnection!, ["complete"]).then(() => {
