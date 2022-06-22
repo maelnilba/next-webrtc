@@ -1,222 +1,274 @@
-import { useEffect, useState } from "react";
-import { useRTCPeerConnection } from "@hooks/useRTCPeerConnection";
+import { useRef, useCallback, useEffect } from "react";
+import { useStateWithCallback } from "@hooks/useStateWithCallback";
+import { useEffectOnce } from "./useEffectOnce";
+import { Channel, PresenceChannel } from "pusher-js";
+import { ACTIONS } from "shared/actions-socket";
 
-// https://github.com/web-platform-tests/wpt/blob/master/webrtc/RTCPeerConnection-helper.js#L191
+export const useWebRTC = (
+  roomId: string,
+  socket: PresenceChannel,
+  emitter: Channel,
+  socketId: string,
+  user: { id: string; name: string; socketId: number }
+) => {
+  const [clients, setClients] = useStateWithCallback([]);
+  const audioElements = useRef<any>({});
+  const connections = useRef<any>({});
+  const localMediaStream = useRef<MediaStream | null>(null);
+  const pusher = useRef<PresenceChannel | null>(null);
+  const emitPusher = useRef<Channel | null>(null);
+  const emit = async (action: any, ...args: any[]) => {
+    await fetch(`api/pusher/${roomId}`, {
+      method: "POST",
+      headers: {
+        Accept: "application/json",
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        action,
+        socketId: socketId,
+        data: { ...args[0] },
+      }),
+    });
+  };
 
-let servers = {
-  iceServers: [
-    {
-      urls: ["stun:stun1.1.google.com:19302", "stun:stun2.l.google.com:19302"],
-    },
-  ],
-};
+  // useEffect(() => {
+  //   console.log(clients);
+  // });
 
-type RTCConfigType = typeof servers;
-
-type useWebRTCProps = {
-  RTCConfig?: RTCConfigType;
-  MediaConfig?: MediaStreamConstraints;
-  onIceCandidate: (...args: any[]) => Promise<any>;
-  localeStream?: MediaStream;
-};
-
-export function useWebRTC(props: useWebRTCProps) {
-  const {
-    peerConnection,
-    waitForIceGatheringState,
-    waitForConnectionStateChange,
-    connectionState,
-    iceGatheringState,
-    iceConnectionState,
-    signalingState,
-  } = useRTCPeerConnection({
-    RTCConfig: props.RTCConfig || servers,
+  useEffectOnce(() => {
+    pusher.current = socket;
+    emitPusher.current = emitter;
   });
 
-  const [localeStream, setLocaleStream] = useState<MediaStream | undefined>(
-    props.localeStream
+  const addNewClient = useCallback(
+    (newClient: any, cb: Function) => {
+      const lookingFor = clients.find(
+        (client: any) => client.id === newClient.id
+      );
+
+      if (lookingFor === undefined) {
+        setClients(
+          (existingClients: any) => [...existingClients, newClient],
+          cb
+        );
+      }
+    },
+    [clients, setClients]
   );
-  const [remoteStream, setRemoteStream] = useState<MediaStream>();
-  const [candidates, setCandidates] = useState<RTCIceCandidateInit[]>([]);
-  const [offer, setOffer] = useState<
-    RTCSessionDescriptionInit | RTCSessionDescription
-  >();
-  const [answer, setAnswer] = useState<
-    RTCSessionDescriptionInit | RTCSessionDescription
-  >();
 
-  const addCandidate = async (candidate: RTCIceCandidateInit) => {
-    if (!peerConnection) return;
-    // add to a queue until states is OK for set them
-    setCandidates((prev) => [...prev, candidate]);
-    // peerConnection.addIceCandidate(candidate);
-  };
+  // Capture media
 
-  const createPeerConnection = async ({
-    type,
-  }: {
-    type: "answer" | "offer";
-  }) => {
-    if (!peerConnection) {
-      throw new Error(`peerConnection is not defined in ${type}`);
-    }
-    if (!localeStream) {
-      throw new Error(`localeStream is not defined in ${type}`);
-    }
-    if (!remoteStream) {
-      throw new Error(`remoteStream is not defined in ${type}`);
-    }
-
-    try {
-      localeStream.getTracks().forEach(async (track) => {
-        // if (peerConnection.connectionState === "new")
-        await waitForConnectionStateChange(peerConnection, ["new"]);
-        peerConnection?.addTrack(track, localeStream);
-      })!;
-
-      peerConnection.ontrack = async (event) => {
-        event.streams[0]?.getTracks().forEach(async (track) => {
-          // if (peerConnection.connectionState === "new")
-          await waitForConnectionStateChange(peerConnection, ["new"]);
-          remoteStream.addTrack(track);
-        });
-      };
-    } catch (error) {
-      console.log("Peer connection error", { peerConnection });
-      throw error;
-    }
-
-    peerConnection.onicecandidate = async (event) => {
-      if (event.candidate) {
-        type === "offer"
-          ? setOffer(peerConnection.localDescription!)
-          : setAnswer(peerConnection.localDescription!);
-        await props.onIceCandidate(JSON.stringify(event.candidate));
-      }
+  useEffect(() => {
+    const startCapture = async () => {
+      localMediaStream.current = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+      });
     };
-  };
-  // Send CreateOffer from Caller (signalling part; custom transport to the other users);
-  // enable PeerConnection.onnegotiationneeded => CreateOffer() only for Caller
 
-  // Callee can be ready with video/audio streams added it to RTCPeerConnection on its side,
-  // then accepts offer and sends answer to Caller (signalling part)
+    startCapture().then(() => {
+      addNewClient(user, () => {
+        const localElement = audioElements.current[user.id];
+        if (localElement) {
+          localElement.volume = 0;
+          localElement.srcObject = localMediaStream.current;
+        }
 
-  // Caller gets the answer
-  // and adds the video/audio streams to RTCPeerConnection conditionally when PeerConnection.connectionState == "new",
-  // the tricky parts: condition connectionState == "new" ensures it does not add again as offer / answer
-  // might be exchanged many times with state being connecting etc.
-  // Another is, if you add video/audio streams before this step,
-  // it will be hard to control the ice sdp flowing
-  // and raising errors at wrong states (relates to comment from Benjamin Trent, here) (signalling part)
-
-  // since offer, answer is exchanged, now many ice events flows are exchanged (signalling part)
-
-  // Connection should be established (assuming STUN configured and if peer to peer not possible, TURN required)
-
-  const createOffer = async () => {
-    await createPeerConnection({ type: "offer" });
-    let _offer = await peerConnection!.createOffer();
-    await peerConnection!.setLocalDescription(_offer);
-    setOffer(_offer);
-
-    return _offer;
-  };
-
-  const createAnswer = async (
-    _offer?: RTCSessionDescription | RTCSessionDescriptionInit
-  ) => {
-    await createPeerConnection({ type: "answer" });
-    if (!offer && !_offer) return;
-
-    if (offer) {
-      await peerConnection!.setRemoteDescription(offer);
-    } else if (_offer) {
-      await peerConnection!.setRemoteDescription(_offer);
-    }
-
-    let _answer = await peerConnection!.createAnswer();
-    await peerConnection!.setLocalDescription(_answer);
-    setAnswer(_answer);
-    return _answer;
-  };
-
-  const addAnswer = async (
-    _answer?: RTCSessionDescription | RTCSessionDescriptionInit
-  ) => {
-    if (!answer && !_answer) return;
-    if (!peerConnection?.currentRemoteDescription) {
-      if (answer) {
-        peerConnection?.setRemoteDescription(answer);
-      } else if (_answer) {
-        peerConnection?.setRemoteDescription(_answer);
-      }
-    }
-  };
-
-  const initLocaleStream = async () => {
-    try {
-      console.log("states of stream ?", props.localeStream);
-      let _localeStream =
-        props.localeStream ||
-        (await navigator.mediaDevices.getUserMedia(
-          props.MediaConfig || {
-            video: true,
-          }
-        ));
-
-      console.log("The localeStream is set to peer connection");
-
-      setLocaleStream(_localeStream);
-      setRemoteStream(new MediaStream());
-    } catch (error) {
-      console.warn("Unable to get user media", error);
-    }
-  };
-
-  const streamDisconnect = () => {
-    console.log("Triggering stream disconnect");
-  };
-
-  useEffect(() => {
-    if (props.localeStream) setLocaleStream(localeStream);
-  }, [props.localeStream]);
-
-  useEffect(() => {
-    // should make other than useeffect imo
-    // maybe possible based on offer/answer description if it's in accept or addanswer
-    if (!peerConnection) return;
-    if (!offer && !answer) {
-      // console.log("answer:", answer, "offer:", offer);
-      return;
-    }
-    waitForIceGatheringState(peerConnection!, ["complete"]).then(() => {
-      console.log("ice gathering complete");
-      console.log("candidates:", candidates);
-      candidates.forEach((candidate) => {
-        peerConnection.addIceCandidate(candidate);
+        emit(ACTIONS.JOIN, { roomId, user });
       });
     });
-  }, [answer, offer]);
 
-  return {
-    peerConnection,
-    initLocaleStream,
-    streamDisconnect,
-    localeStream,
-    remoteStream,
-    offer,
-    setOffer,
-    answer,
-    setAnswer,
-    createOffer,
-    createAnswer,
-    addAnswer,
-    addCandidate,
-    peerConnectionStates: {
-      connectionState,
-      iceConnectionState,
-      iceGatheringState,
-      signalingState,
-    },
+    return () => {
+      // Leaving the room
+      localMediaStream.current?.getTracks().forEach((track) => track.stop());
+
+      emit(ACTIONS.LEAVE, { roomId });
+    };
+  }, []);
+
+  useEffect(() => {
+    const handleNewPeer = async ({
+      peerId,
+      createOffer,
+      user: remoteUser,
+    }: {
+      peerId: string;
+      createOffer: string;
+      user: { id: string; name: string };
+    }) => {
+      // if already connected then give warning
+      if (peerId in connections.current) {
+        return console.warn(
+          `You are already connected with ${peerId} (${user.name})`
+        );
+      }
+
+      connections.current[peerId] = new RTCPeerConnection({
+        iceServers: [
+          {
+            urls: [
+              "stun:stun1.1.google.com:19302",
+              "stun:stun2.l.google.com:19302",
+            ],
+          },
+        ],
+      });
+
+      // Handle new ice candidate
+      connections.current[peerId].onicecandidate = (
+        event: RTCPeerConnectionIceEvent
+      ) => {
+        emit(ACTIONS.RELAY_ICE, {
+          peerId,
+          icecandidate: event.candidate,
+        });
+      };
+
+      // Handle on track on this connection
+      console.log(connections);
+      connections.current[peerId].ontrack = ({
+        streams: [remoteStream],
+      }: {
+        streams: [MediaStream];
+      }) => {
+        addNewClient(remoteUser, () => {
+          if (audioElements.current[remoteUser.id]) {
+            audioElements.current[remoteUser.id].srcObject = remoteStream;
+          } else {
+            let settled = false;
+            const interval = setInterval(() => {
+              if (audioElements.current[remoteUser.id]) {
+                audioElements.current[remoteUser.id].srcObject = remoteStream;
+                settled = true;
+              }
+              if (settled) {
+                clearInterval(interval);
+              }
+            }, 1000);
+          }
+        });
+      };
+
+      // Add local track to remote connections
+      localMediaStream.current?.getTracks().forEach((track) => {
+        connections.current[peerId].addTrack(track, localMediaStream.current);
+      });
+
+      // Create offer
+      if (createOffer) {
+        const offer = await connections.current[peerId].createOffer();
+        await connections.current[peerId].setLocalDescription(offer);
+
+        emit(ACTIONS.RELAY_SDP, {
+          peerId,
+          sessionDescription: offer,
+        });
+      } // send to another client our infos
+      else {
+        emit(ACTIONS.ADD_PEER_RESPONSE, {
+          peerId,
+          createOffer: true,
+          user: {
+            id: user.id,
+            name: user.name,
+          },
+        });
+      }
+    };
+
+    pusher.current?.bind(ACTIONS.ADD_PEER, handleNewPeer);
+    emitPusher.current?.bind(ACTIONS.ADD_PEER, handleNewPeer);
+    return () => {
+      pusher.current?.unbind(ACTIONS.ADD_PEER);
+      emitPusher.current?.unbind(ACTIONS.ADD_PEER);
+    };
+  }, []);
+
+  // Handle ice candidate
+  useEffect(() => {
+    emitPusher.current?.bind(
+      ACTIONS.ICE_CANDIDATE,
+      ({
+        peerId,
+        icecandidate,
+      }: {
+        peerId: string;
+        icecandidate: RTCIceCandidate;
+      }) => {
+        if (icecandidate) {
+          connections.current[peerId].addIceCandidate(icecandidate);
+        }
+      }
+    );
+
+    return () => {
+      emitPusher.current?.unbind(ACTIONS.ICE_CANDIDATE);
+    };
+  }, []);
+
+  // Handle SDP
+  useEffect(() => {
+    const handleRemoteSdp = async ({
+      peerId,
+      sessionDescription: remoteSessionDescription,
+    }: {
+      peerId: string;
+      sessionDescription: RTCSessionDescriptionInit;
+    }) => {
+      connections.current[peerId].setRemoteDescription(
+        new RTCSessionDescription(remoteSessionDescription)
+      );
+
+      // if session description is type of offer then create an answer
+
+      if (remoteSessionDescription.type === "offer") {
+        const connection = connections.current[peerId];
+        const answer = await connection.createAnswer();
+
+        connection.setLocalDescription(answer);
+
+        emit(ACTIONS.RELAY_SDP, {
+          peerId,
+          sessionDescription: answer,
+        });
+      }
+    };
+    emitPusher.current?.bind(ACTIONS.SESSION_DESCRIPTION, handleRemoteSdp);
+
+    return () => {
+      emitPusher.current?.unbind(ACTIONS.SESSION_DESCRIPTION);
+    };
+  }, []);
+
+  // Handle remove peer
+  useEffect(() => {
+    const handleRemovePeer = async ({
+      peerId,
+      userId,
+    }: {
+      peerId: string;
+      userId: string;
+    }) => {
+      if (connections.current[peerId]) {
+        connections.current[peerId].close();
+      }
+
+      delete connections.current[peerId];
+      delete audioElements.current[peerId];
+      setClients((list: any) =>
+        list.filter((client: any) => client.id !== userId)
+      );
+    };
+
+    pusher.current?.bind(ACTIONS.REMOVE_PEER, handleRemovePeer);
+    return () => {
+      pusher.current?.unbind(ACTIONS.REMOVE_PEER);
+    };
+  }, []);
+
+  const provideRef = (instance: any, userId: string) => {
+    audioElements.current[userId] = instance;
   };
-}
+
+  return { clients, provideRef };
+};
