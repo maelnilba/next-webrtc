@@ -29,7 +29,7 @@ const Room: React.FC<{ client: Pusher; roomId: string }> = ({
     ) as PresenceChannel;
 
     channel.bind("pusher:member_added", () => null);
-    channel.bind("pusher:member_removed", () => null);
+
     channel.bind("pusher:subscription_succeeded", (members: Members) => {
       setMe({
         id: members.myID,

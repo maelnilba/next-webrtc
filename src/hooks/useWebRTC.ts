@@ -1,7 +1,7 @@
 import { useRef, useCallback, useEffect } from "react";
 import { useStateWithCallback } from "@hooks/useStateWithCallback";
 import { useEffectOnce } from "./useEffectOnce";
-import { Channel, PresenceChannel } from "pusher-js";
+import { Channel, Members, PresenceChannel } from "pusher-js";
 import { ACTIONS } from "shared/actions-socket";
 
 type User = {
@@ -41,10 +41,6 @@ export const useWebRTC = (
       }),
     });
   };
-
-  // useEffect(() => {
-  //   console.log(clients);
-  // });
 
   useEffectOnce(() => {
     pusher.current = socket;
@@ -95,7 +91,7 @@ export const useWebRTC = (
       // Leaving the room
       localMediaStream.current?.getTracks().forEach((track) => track.stop());
 
-      emit(ACTIONS.LEAVE, { roomId });
+      emit(ACTIONS.LEAVE);
     };
   }, []);
 
@@ -265,20 +261,27 @@ export const useWebRTC = (
       peerId,
       userId,
     }: {
-      peerId: string;
-      userId: string;
+      peerId: string | undefined;
+      userId: string | undefined;
     }) => {
-      if (connections.current[peerId]) {
-        connections.current[peerId].close();
-      }
+      if (peerId) {
+        if (connections.current[peerId]) {
+          connections.current[peerId].close();
+        }
 
-      delete connections.current[peerId];
-      delete audioElements.current[peerId];
-      setClients((list: any) =>
-        list.filter((client: any) => client.id !== userId)
-      );
+        delete connections.current[peerId];
+        delete audioElements.current[peerId];
+      }
+      if (userId) {
+        setClients((list: any) =>
+          list.filter((client: any) => client.id !== userId)
+        );
+      }
     };
 
+    pusher.current?.bind("pusher:member_removed", (member: any) => {
+      handleRemovePeer({ peerId: undefined, userId: member.id });
+    });
     pusher.current?.bind(ACTIONS.REMOVE_PEER, handleRemovePeer);
     return () => {
       pusher.current?.unbind(ACTIONS.REMOVE_PEER);

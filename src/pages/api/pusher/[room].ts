@@ -57,5 +57,11 @@ export default async function handler(
     );
   }
 
+  if (action === ACTIONS.LEAVE) {
+    pusher.trigger(`presence-channel-${room}`, ACTIONS.REMOVE_PEER, {
+      peerId: socketId,
+    });
+  }
+
   res.json({ message: "completed" });
 }
