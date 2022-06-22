@@ -75,14 +75,14 @@ export const useWebRTC = (
       user: User;
     }) => {
       console.log("RELAY TALKING");
-      setClients((list: any) =>
-        list.map((client: any) => {
-          return {
-            ...client,
-            isTalking: client.id === user.id ? isTalking : client?.isTalking,
-          };
-        })
-      );
+      // setClients((list: any) =>
+      //   list.map((client: any) => {
+      //     return {
+      //       ...client,
+      //       isTalking: client.id === user.id ? isTalking : client?.isTalking,
+      //     };
+      //   })
+      // );
     };
     pusher.current?.bind(ACTIONS.RELAY_TALKING, handleRelayTalking);
     return () => {
@@ -95,6 +95,7 @@ export const useWebRTC = (
       const lookingFor = clients.find(
         (client: any) => client.id === newClient.id
       );
+      // console.log(newClient);
 
       if (lookingFor === undefined) {
         setClients(

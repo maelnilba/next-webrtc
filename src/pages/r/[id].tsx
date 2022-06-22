@@ -111,7 +111,7 @@ const RoomChat: React.FC<{
       user,
     },
     {
-      audio: true,
+      audio: false,
       video: true,
     }
   );
@@ -174,6 +174,7 @@ const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
 
       bg-slate-500 shadow-lg  shadow-slate-500/50`}
     >
+      <div>{props.id}</div>
       <Spinner />
       <div className="z-10">
         <video
