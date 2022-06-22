@@ -1,6 +1,7 @@
 import { usePusher } from "@hooks/usePusher";
 import { useWebRTC } from "@hooks/useWebRTC";
 import type { NextPage } from "next";
+import Head from "next/head";
 import { useRouter } from "next/router";
 import Pusher, { Channel, Members, PresenceChannel } from "pusher-js";
 import { useEffect, useRef, useState } from "react";
@@ -13,7 +14,10 @@ const Index: NextPage = () => {
 
   if (!pusherClient) return <Spinner />;
   return (
-    <div className="flex h-screen w-screen flex-col items-center justify-center bg-slate-800">
+    <div className="flex h-screen w-screen flex-col items-center justify-center bg-gray-800">
+      <Head>
+        <title>{room} - WebRTC Channel</title>
+      </Head>
       <div className="absolute top-1 my-2 text-4xl capitalize">{room}</div>
       <Room
         client={pusherClient}
@@ -101,7 +105,7 @@ const RoomChat: React.FC<{
       user,
     },
     {
-      audio: false,
+      audio: true,
       video: true,
     }
   );
@@ -144,13 +148,15 @@ type VideoRTCProps = {
   ratio: number;
 };
 const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
-  const streamRef = useRef<HTMLVideoElement>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  // const audioRef = useRef<HTMLAudioElement>(null);
 
   // const click = () => {
   //   console.log((streamRef.current?.srcObject as MediaStream)?.active);
   // };
   useEffect(() => {
-    props.provider(streamRef.current, props.id);
+    // props.provider(audioRef.current, props.id);
+    props.provider(videoRef.current, props.id);
   }, []);
   return (
     <div
@@ -167,9 +173,10 @@ const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
         <video
           className=" aspect-[4/3]"
           width={`${props.ratio * 16}rem`}
-          ref={streamRef}
+          ref={videoRef}
           autoPlay
         />
+        {/* <audio ref={audioRef} autoPlay></audio> */}
       </div>
     </div>
   );
@@ -179,7 +186,7 @@ const Spinner = () => (
   <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 transform">
     <svg
       role="status"
-      className="mr-2 h-8 w-8 animate-spin fill-slate-600 text-gray-200 dark:text-gray-600"
+      className="mr-2 h-8 w-8 animate-spin fill-yellow-500 text-gray-200 dark:text-gray-600"
       viewBox="0 0 100 101"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"

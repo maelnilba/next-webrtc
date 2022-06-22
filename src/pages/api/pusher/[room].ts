@@ -8,7 +8,6 @@ export default async function handler(
 ) {
   const { room } = req.query;
   const { action, socketId, data } = req.body;
-  // console.log(req.body);
   if (action === ACTIONS.JOIN) {
     const { user } = data;
     await pusher.trigger(

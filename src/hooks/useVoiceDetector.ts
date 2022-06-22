@@ -58,6 +58,10 @@ export function useVoiceDetector() {
 
   useEffect(() => {
     requestMic();
+    return () => {
+      audioContext.current?.close();
+      audioElement.current?.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
   return {
