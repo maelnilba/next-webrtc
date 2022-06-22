@@ -10,8 +10,9 @@ const Index: NextPage = () => {
       <Head>
         <title>Next WebRTC</title>
       </Head>
-      <div className="flex flex-grow items-end">
+      <div className="flex flex-grow  items-end ">
         <form
+          className="flex max-w-md flex-col justify-end "
           onSubmit={(e) => {
             e.preventDefault();
             const value = (e.currentTarget.elements.item(0) as HTMLInputElement)
@@ -22,9 +23,16 @@ const Index: NextPage = () => {
           }}
         >
           <input
+            name="room_input"
             className="rounded-xl bg-gray-700 p-4"
             placeholder="Entrer a room name"
           />
+          {router.query["invalid"] && (
+            <label htmlFor="room_input" className="mt-2">
+              Room names should only include lower and uppercase letters,
+              numbers and the following punctuation _ - = @ , . ;
+            </label>
+          )}
         </form>
       </div>
       <div className="flex flex-1"></div>

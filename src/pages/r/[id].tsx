@@ -18,7 +18,9 @@ const Index: NextPage = () => {
       <Head>
         <title>{room} - WebRTC Channel</title>
       </Head>
-      <div className="absolute top-1 my-2 text-4xl capitalize">{room}</div>
+      <div className="absolute top-1 my-2 text-4xl first-letter:uppercase">
+        {room}
+      </div>
       <Room
         client={pusherClient}
         roomId={room.replaceAll("/", "").replaceAll(" ", "")}
@@ -31,6 +33,7 @@ const Room: React.FC<{ client: Pusher; roomId: string }> = ({
   client,
   roomId,
 }) => {
+  const router = useRouter();
   const [, forceRerender] = useState<number>(0);
   const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [socketId, setSocketId] = useState<string>("");
@@ -42,6 +45,9 @@ const Room: React.FC<{ client: Pusher; roomId: string }> = ({
       `presence-channel-${roomId}`
     ) as PresenceChannel;
 
+    channel.bind("pusher:subscription_error", () =>
+      router.push("/?invalid=true", "/")
+    );
     channel.bind("pusher:member_added", () => null);
 
     channel.bind("pusher:subscription_succeeded", (members: Members) => {

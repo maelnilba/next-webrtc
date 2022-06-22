@@ -11,7 +11,8 @@ export function useVoiceDetector() {
       audioContext.current = new AudioContext();
       try {
         const s = await navigator.mediaDevices.getUserMedia({ audio: true });
-        (audioElement.current = s), (Stream = s);
+        audioElement.current = s;
+        Stream = s;
       } catch (error) {
         handleMicConnectError(error);
       }
