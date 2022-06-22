@@ -83,11 +83,17 @@ const RoomChat: React.FC<{
   roomId: string;
 }> = ({ socket, socketId, user, emitter, roomId }) => {
   const { clients, provideRef } = useWebRTC(
-    roomId,
-    socket,
-    emitter,
-    socketId,
-    user
+    {
+      roomId,
+      socket,
+      emitter,
+      socketId,
+      user,
+    },
+    {
+      audio: false,
+      video: true,
+    }
   );
   return (
     <div className="flex h-screen w-screen flex-col items-center justify-center bg-blue-300">
@@ -101,6 +107,10 @@ const RoomChat: React.FC<{
               ref={(instance) => provideRef(instance, client.id)}
               autoPlay
             ></audio>
+            <video
+              ref={(instance) => provideRef(instance, client.id)}
+              autoPlay
+            />
           </div>
         );
       })}

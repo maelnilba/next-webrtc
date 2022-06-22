@@ -4,16 +4,26 @@ import { useEffectOnce } from "./useEffectOnce";
 import { Channel, PresenceChannel } from "pusher-js";
 import { ACTIONS } from "shared/actions-socket";
 
+type User = {
+  id: string;
+  name: string;
+};
+
+type WebRTCProps = {
+  roomId: string;
+  socket: PresenceChannel;
+  emitter: Channel;
+  socketId: string;
+  user: User;
+};
+
 export const useWebRTC = (
-  roomId: string,
-  socket: PresenceChannel,
-  emitter: Channel,
-  socketId: string,
-  user: { id: string; name: string; socketId: number }
+  { roomId, socket, emitter, socketId, user }: WebRTCProps,
+  userMedia?: MediaStreamConstraints
 ) => {
   const [clients, setClients] = useStateWithCallback([]);
   const audioElements = useRef<any>({});
-  const connections = useRef<any>({});
+  const connections = useRef<{ [key: string]: any }>({});
   const localMediaStream = useRef<MediaStream | null>(null);
   const pusher = useRef<PresenceChannel | null>(null);
   const emitPusher = useRef<Channel | null>(null);
@@ -61,9 +71,11 @@ export const useWebRTC = (
 
   useEffect(() => {
     const startCapture = async () => {
-      localMediaStream.current = await navigator.mediaDevices.getUserMedia({
-        audio: true,
-      });
+      localMediaStream.current = await navigator.mediaDevices.getUserMedia(
+        userMedia || {
+          audio: true,
+        }
+      );
     };
 
     startCapture().then(() => {
@@ -185,20 +197,27 @@ export const useWebRTC = (
 
   // Handle ice candidate
   useEffect(() => {
-    emitPusher.current?.bind(
-      ACTIONS.ICE_CANDIDATE,
-      ({
-        peerId,
-        icecandidate,
-      }: {
-        peerId: string;
-        icecandidate: RTCIceCandidate;
-      }) => {
+    const handleIceCandidate = ({
+      peerId,
+      icecandidate,
+    }: {
+      peerId: string;
+      icecandidate: RTCIceCandidate;
+    }) => {
+      try {
         if (icecandidate) {
-          connections.current[peerId].addIceCandidate(icecandidate);
+          (connections.current[peerId] as RTCPeerConnection)
+            .addIceCandidate(icecandidate)
+            .catch((error) => {
+              console.warn(error);
+            });
         }
+      } catch (error) {
+        //
       }
-    );
+    };
+
+    emitPusher.current?.bind(ACTIONS.ICE_CANDIDATE, handleIceCandidate);
 
     return () => {
       emitPusher.current?.unbind(ACTIONS.ICE_CANDIDATE);
