@@ -12,7 +12,9 @@ const Index: NextPage = () => {
           e.preventDefault();
           const value = (e.currentTarget.elements.item(0) as HTMLInputElement)
             ?.value;
-          if (value) router.push(`/r/${value}`);
+          if (value) {
+            router.push(`/r/${value.replaceAll(" ", "").replaceAll("/", "")}`);
+          }
         }}
       >
         <input

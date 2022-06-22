@@ -1,4 +1,4 @@
-import { useRef, useCallback, useEffect } from "react";
+import { useRef, useCallback, useEffect, useState } from "react";
 import { useStateWithCallback } from "@hooks/useStateWithCallback";
 import { useEffectOnce } from "./useEffectOnce";
 import { Channel, Members, PresenceChannel } from "pusher-js";
@@ -22,7 +22,7 @@ export const useWebRTC = (
   userMedia?: MediaStreamConstraints
 ) => {
   const [clients, setClients] = useStateWithCallback([]);
-  const audioElements = useRef<any>({});
+  const mediaElements = useRef<any>({});
   const connections = useRef<{ [key: string]: any }>({});
   const localMediaStream = useRef<MediaStream | null>(null);
   const pusher = useRef<PresenceChannel | null>(null);
@@ -77,7 +77,7 @@ export const useWebRTC = (
 
     startCapture().then(() => {
       addNewClient(user, () => {
-        const localElement = audioElements.current[user.id];
+        const localElement = mediaElements.current[user.id];
         if (localElement) {
           localElement.volume = 0;
           localElement.srcObject = localMediaStream.current;
@@ -123,6 +123,15 @@ export const useWebRTC = (
         ],
       });
 
+      const onConnectionStateChange = (e: any) => {
+        const state = e.currentTarget.connectionState;
+      };
+      if (connections.current && connections.current[user.id])
+        (connections.current[user.id] as RTCPeerConnection).addEventListener(
+          "connectionstatechange",
+          onConnectionStateChange
+        );
+
       // Handle new ice candidate
       connections.current[peerId].onicecandidate = (
         event: RTCPeerConnectionIceEvent
@@ -139,14 +148,14 @@ export const useWebRTC = (
       }: {
         streams: [MediaStream];
       }) => {
-        addNewClient(remoteUser, () => {
-          if (audioElements.current[remoteUser.id]) {
-            audioElements.current[remoteUser.id].srcObject = remoteStream;
+        addNewClient({ ...remoteUser, peerId }, () => {
+          if (mediaElements.current[remoteUser.id]) {
+            mediaElements.current[remoteUser.id].srcObject = remoteStream;
           } else {
             let settled = false;
             const interval = setInterval(() => {
-              if (audioElements.current[remoteUser.id]) {
-                audioElements.current[remoteUser.id].srcObject = remoteStream;
+              if (mediaElements.current[remoteUser.id]) {
+                mediaElements.current[remoteUser.id].srcObject = remoteStream;
                 settled = true;
               }
               if (settled) {
@@ -203,11 +212,13 @@ export const useWebRTC = (
     }) => {
       try {
         if (icecandidate) {
-          (connections.current[peerId] as RTCPeerConnection)
-            .addIceCandidate(icecandidate)
-            .catch((error) => {
-              console.warn(error);
-            });
+          setTimeout(() => {
+            (connections.current[peerId] as RTCPeerConnection)
+              .addIceCandidate(icecandidate)
+              .catch((error) => {
+                console.warn(error);
+              });
+          }, 200);
         }
       } catch (error) {
         //
@@ -270,7 +281,7 @@ export const useWebRTC = (
         }
 
         delete connections.current[peerId];
-        delete audioElements.current[peerId];
+        delete mediaElements.current[peerId];
       }
       if (userId) {
         setClients((list: any) =>
@@ -289,12 +300,13 @@ export const useWebRTC = (
   }, []);
 
   const provideRef = (instance: any, userId: string) => {
-    audioElements.current[userId] = instance;
+    mediaElements.current[userId] = instance;
   };
 
   return { clients, provideRef };
 };
 
+let renders = 0;
 // Returns a promise that resolves when the |transport.state| is |state|
 // This should work for RTCSctpTransport, RTCDtlsTransport and RTCIceTransport.
 async function waitForState(
