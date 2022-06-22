@@ -2,27 +2,24 @@ import { useEffect, useRef } from "react";
 import vad from "voice-activity-detection";
 
 export function useVoiceDetector() {
-  const voiceDetector = useRef<any | null>(null);
   const audioContext = useRef<any | null>(null);
-  async function requestMic() {
+  const audioElement = useRef<MediaStream | null>(null);
+  const requestMic = async (): Promise<MediaStream | null> => {
+    let Stream: null | MediaStream = null;
     try {
       window.AudioContext = window.AudioContext;
       audioContext.current = new AudioContext();
-
-      navigator.mediaDevices
-        .getUserMedia({
-          audio: true,
-        })
-        .then((stream: MediaStream) => {
-          startUserMedia(stream);
-        })
-        .catch((reason) => {
-          handleMicConnectError(reason);
-        });
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: true });
+        (audioElement.current = s), (Stream = s);
+      } catch (error) {
+        handleMicConnectError(error);
+      }
     } catch (e) {
       handleUserMediaError();
     }
-  }
+    return Stream;
+  };
 
   function handleUserMediaError() {
     console.warn("Mic input is not supported by the browser.");
@@ -35,26 +32,35 @@ export function useVoiceDetector() {
     );
   }
 
-  function startUserMedia(stream: any) {
-    var options = {
-      onVoiceStart: function () {
-        console.log("voice start");
-        console.log("Voice state: <strong>active</strong>");
-      },
-      onVoiceStop: function () {
-        console.log("voice stop");
-        console.log("Voice state: <strong>inactive</strong>");
-      },
-      onUpdate: function (val: any) {
-        //console.log('curr val:', val);
-        console.log(
-          "Current voice activity value: <strong>' + val + '</strong>"
-        );
-      },
-    };
-    vad(audioContext.current, stream, options);
-  }
+  const voiceDetector = async (options: {
+    onVoiceStart: () => void;
+    onVoiceStop: () => void;
+    onUpdate?: () => void;
+  }) => {
+    let stream = null;
+    if (!audioContext.current) {
+      stream = await requestMic();
+    }
+    if (!audioElement.current) {
+      if (stream) vad(audioContext.current, stream, options);
+      else {
+        stream = await requestMic();
+        if (!stream) {
+          handleMicConnectError("");
+          return;
+        }
+        vad(audioContext.current, stream, options);
+      }
+      return;
+    }
+    vad(audioContext.current, audioElement.current, options);
+  };
+
   useEffect(() => {
     requestMic();
   }, []);
+
+  return {
+    vad: voiceDetector,
+  };
 }

@@ -11,7 +11,7 @@ const Index: NextPage = () => {
           const value = (e.currentTarget.elements.item(0) as HTMLInputElement)
             ?.value;
           if (value) {
-            router.push(`/r/${value.replaceAll(" ", "").replaceAll("/", "")}`);
+            router.push(`/r/${value.replaceAll("/", "")}`);
           }
         }}
       >

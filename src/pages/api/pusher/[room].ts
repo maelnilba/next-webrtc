@@ -8,7 +8,7 @@ export default async function handler(
 ) {
   const { room } = req.query;
   const { action, socketId, data } = req.body;
-  console.log(req.body);
+  // console.log(req.body);
   if (action === ACTIONS.JOIN) {
     const { user } = data;
     await pusher.trigger(
@@ -65,17 +65,10 @@ export default async function handler(
 
   if (action === ACTIONS.TALKING) {
     const { isTalking, user } = data;
-    pusher.trigger(
-      `presence-channel-${room}`,
-      ACTIONS.RELAY_TALKING,
-      {
-        isTalking,
-        user,
-      },
-      {
-        socket_id: socketId,
-      }
-    );
+    pusher.trigger(`presence-channel-${room}`, ACTIONS.RELAY_TALKING, {
+      isTalking,
+      user,
+    });
   }
 
   res.json({ message: "completed" });

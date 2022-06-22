@@ -1,8 +1,9 @@
-import { useRef, useCallback, useEffect, useState } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { useStateWithCallback } from "@hooks/useStateWithCallback";
 import { useEffectOnce } from "./useEffectOnce";
-import { Channel, Members, PresenceChannel } from "pusher-js";
+import { Channel, PresenceChannel } from "pusher-js";
 import { ACTIONS } from "shared/actions-socket";
+import { useVoiceDetector } from "@hooks/useVoiceDetector";
 
 type User = {
   id: string;
@@ -41,11 +42,53 @@ export const useWebRTC = (
       }),
     });
   };
-
+  const { vad } = useVoiceDetector();
   useEffectOnce(() => {
     pusher.current = socket;
     emitPusher.current = emitter;
   });
+
+  // Detect when the user is active by voice detector
+  useEffect(() => {
+    const onVoiceStart = () => {
+      emit(ACTIONS.TALKING, {
+        isTalking: true,
+        user,
+      });
+    };
+    const onVoiceStop = () => {
+      emit(ACTIONS.TALKING, {
+        isTalking: false,
+        user,
+      });
+    };
+    vad({
+      onVoiceStart,
+      onVoiceStop,
+    });
+
+    const handleRelayTalking = ({
+      isTalking,
+      user,
+    }: {
+      isTalking: boolean;
+      user: User;
+    }) => {
+      console.log("RELAY TALKING");
+      setClients((list: any) =>
+        list.map((client: any) => {
+          return {
+            ...client,
+            isTalking: client.id === user.id ? isTalking : client?.isTalking,
+          };
+        })
+      );
+    };
+    pusher.current?.bind(ACTIONS.RELAY_TALKING, handleRelayTalking);
+    return () => {
+      pusher.current?.unbind(ACTIONS.RELAY_TALKING);
+    };
+  }, []);
 
   const addNewClient = useCallback(
     (newClient: any, cb: Function) => {
@@ -70,7 +113,7 @@ export const useWebRTC = (
       localMediaStream.current = await navigator.mediaDevices.getUserMedia(
         userMedia || {
           video: true,
-          audio: false,
+          audio: true,
         }
       );
     };
