@@ -125,7 +125,6 @@ export const useWebRTC = (
       };
 
       // Handle on track on this connection
-      console.log(connections);
       connections.current[peerId].ontrack = ({
         streams: [remoteStream],
       }: {
@@ -272,3 +271,62 @@ export const useWebRTC = (
 
   return { clients, provideRef };
 };
+
+// Returns a promise that resolves when the |transport.state| is |state|
+// This should work for RTCSctpTransport, RTCDtlsTransport and RTCIceTransport.
+async function waitForState(
+  transport: RTCSctpTransport | RTCDtlsTransport | RTCIceTransport,
+  state: RTCSctpTransportState | RTCDtlsTransportState | RTCIceTransportState
+) {
+  while (transport.state != state) {
+    await waitUntilEvent(transport, "statechange");
+  }
+}
+
+// Returns a promise that resolves when |pc.iceConnectionState| is 'connected'
+// or 'completed'.
+async function listenToIceConnected(pc: RTCPeerConnection) {
+  await waitForIceStateChange(pc, ["connected", "completed"]);
+}
+
+// Returns a promise that resolves when |pc.iceConnectionState| is in one of the
+// wanted states.
+async function waitForIceStateChange(
+  pc: RTCPeerConnection,
+  wantedStates: RTCIceConnectionState[]
+) {
+  while (!wantedStates.includes(pc.iceConnectionState)) {
+    await waitUntilEvent(pc, "iceconnectionstatechange");
+  }
+}
+
+// Returns a promise that resolves when |pc.connectionState| is 'connected'.
+async function listenToConnected(pc: RTCPeerConnection) {
+  while (pc.connectionState != "connected") {
+    await waitUntilEvent(pc, "connectionstatechange");
+  }
+}
+
+// Returns a promise that resolves when |pc.connectionState| is in one of the
+// wanted states.
+async function waitForConnectionStateChange(
+  pc: RTCPeerConnection,
+  wantedStates: RTCPeerConnectionState[]
+) {
+  while (!wantedStates.includes(pc.connectionState)) {
+    await waitUntilEvent(pc, "connectionstatechange");
+  }
+}
+
+async function waitForIceGatheringState(
+  pc: RTCPeerConnection,
+  wantedStates: RTCIceGatheringState[]
+) {
+  while (!wantedStates.includes(pc.iceGatheringState)) {
+    await waitUntilEvent(pc, "icegatheringstatechange");
+  }
+}
+
+function waitUntilEvent(obj: any, name: string) {
+  return new Promise((r) => obj.addEventListener(name, r, { once: true }));
+}
