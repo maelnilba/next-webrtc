@@ -10,7 +10,7 @@ export default async function handler(
   const { action, socketId, data } = req.body;
   console.log(req.body);
   if (action === ACTIONS.JOIN) {
-    const { roomId, user } = data;
+    const { user } = data;
     await pusher.trigger(
       `presence-channel-${room}`,
       ACTIONS.ADD_PEER,
@@ -61,6 +61,21 @@ export default async function handler(
     pusher.trigger(`presence-channel-${room}`, ACTIONS.REMOVE_PEER, {
       peerId: socketId,
     });
+  }
+
+  if (action === ACTIONS.TALKING) {
+    const { isTalking, user } = data;
+    pusher.trigger(
+      `presence-channel-${room}`,
+      ACTIONS.RELAY_TALKING,
+      {
+        isTalking,
+        user,
+      },
+      {
+        socket_id: socketId,
+      }
+    );
   }
 
   res.json({ message: "completed" });

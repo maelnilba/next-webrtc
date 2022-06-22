@@ -8,4 +8,6 @@ export const ACTIONS = {
   ICE_CANDIDATE: "client-event-ice-candidate",
   SESSION_DESCRIPTION: "client-event-session-description",
   REMOVE_PEER: "client-event-remove-peer",
+  TALKING: "client-event-talking",
+  RELAY_TALKING: "client-event-relay-talking",
 };

@@ -306,7 +306,6 @@ export const useWebRTC = (
   return { clients, provideRef };
 };
 
-let renders = 0;
 // Returns a promise that resolves when the |transport.state| is |state|
 // This should work for RTCSctpTransport, RTCDtlsTransport and RTCIceTransport.
 async function waitForState(
