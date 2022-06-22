@@ -28,7 +28,7 @@ export const useWebRTC = (
   const pusher = useRef<PresenceChannel | null>(null);
   const emitPusher = useRef<Channel | null>(null);
   const emit = async (action: any, ...args: any[]) => {
-    await fetch(`api/pusher/${roomId}`, {
+    await fetch(`/api/pusher/${roomId}`, {
       method: "POST",
       headers: {
         Accept: "application/json",
