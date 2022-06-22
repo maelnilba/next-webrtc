@@ -1,12 +1,10 @@
 import { usePusher } from "@hooks/usePusher";
 import { useWebRTC } from "@hooks/useWebRTC";
+
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
 import Pusher, { Channel, Members, PresenceChannel } from "pusher-js";
 import { useEffect, useRef, useState } from "react";
-import SpeechRecognition, {
-  useSpeechRecognition,
-} from "react-speech-recognition";
 
 const Index: NextPage = () => {
   const router = useRouter();
@@ -114,7 +112,6 @@ const RoomChat: React.FC<{
   };
   return (
     <div className="flex h-full w-full flex-wrap items-center justify-center space-x-2 ">
-      {/* <div>{listening ? "listening" : "not listening"}</div> */}
       {clients.map((client: any, _: any, arrs: any[]) => {
         return (
           <VideoRTC
@@ -139,8 +136,6 @@ const VideoRTC: React.FC<{ props?: any }> = ({ props }) => {
   // };
   useEffect(() => {
     props.provider(streamRef.current, props.id);
-    console.log(streamRef.current);
-    console.log(props.ratio);
   }, []);
   return (
     <div
