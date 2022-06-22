@@ -1,6 +1,4 @@
 import { NextPage } from "next";
-import { Head } from "next/document";
-import Link from "next/link";
 import { useRouter } from "next/router";
 import { useEffect } from "react";
 
