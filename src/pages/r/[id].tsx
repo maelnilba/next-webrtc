@@ -1,12 +1,14 @@
 import { usePusher } from "@hooks/usePusher";
+import { useVoiceDetector } from "@hooks/useVoiceDetector";
 import { useWebRTC } from "@hooks/useWebRTC";
-
 import type { NextPage } from "next";
 import { useRouter } from "next/router";
 import Pusher, { Channel, Members, PresenceChannel } from "pusher-js";
 import { useEffect, useRef, useState } from "react";
 
 const Index: NextPage = () => {
+  const vad = useVoiceDetector();
+
   const router = useRouter();
   const room = router.query.id;
   const pusherClient = usePusher();
