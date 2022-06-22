@@ -73,7 +73,8 @@ export const useWebRTC = (
     const startCapture = async () => {
       localMediaStream.current = await navigator.mediaDevices.getUserMedia(
         userMedia || {
-          audio: true,
+          video: true,
+          audio: false,
         }
       );
     };
