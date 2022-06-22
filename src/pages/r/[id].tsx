@@ -28,7 +28,7 @@ const Room: React.FC<{ client: Pusher; roomId: string }> = ({
   roomId,
 }) => {
   const [, forceRerender] = useState<number>(0);
-  const [me, setMe] = useState<any>(null);
+  const [me, setMe] = useState<{ id: string; name: string } | null>(null);
   const [socketId, setSocketId] = useState<string>("");
   const socket = useRef<PresenceChannel | null>(null);
   const emitter = useRef<Channel | null>(null);
@@ -89,7 +89,7 @@ const RoomChat: React.FC<{
   socket: PresenceChannel;
   emitter: Channel;
   socketId: string;
-  user: any;
+  user: { id: string; name: string };
   roomId: string;
 }> = ({ socket, socketId, user, emitter, roomId }) => {
   const { clients, provideRef } = useWebRTC(
@@ -111,27 +111,39 @@ const RoomChat: React.FC<{
     if (lenght === 2) return 40;
     if (lenght >= 3) return 28;
     if (lenght >= 6) return 16;
+    return 16;
   };
   return (
     <div className="flex h-full w-full flex-wrap items-center justify-center space-x-2 ">
-      {clients.map((client: any, _: any, arrs: any[]) => {
-        return (
-          <VideoRTC
-            key={client.id}
-            props={{
-              provider: provideRef,
-              id: client.id,
-              isTalking: client?.isTalking,
-              ratio: getRatio(arrs.length),
-            }}
-          />
-        );
-      })}
+      {clients.map(
+        (
+          client: { id: string; isTalking: boolean | undefined },
+          _: number,
+          arrs: { id: string; isTalking: boolean | undefined }[]
+        ) => {
+          return (
+            <VideoRTC
+              key={client.id}
+              props={{
+                provider: provideRef,
+                id: client.id,
+                isTalking: client?.isTalking,
+                ratio: getRatio(arrs.length),
+              }}
+            />
+          );
+        }
+      )}
     </div>
   );
 };
-
-const VideoRTC: React.FC<{ props?: any }> = ({ props }) => {
+type VideoRTCProps = {
+  provider: (instance: any, userId: string) => void;
+  id: string;
+  isTalking: boolean | undefined;
+  ratio: number;
+};
+const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
   const streamRef = useRef<HTMLVideoElement>(null);
 
   // const click = () => {

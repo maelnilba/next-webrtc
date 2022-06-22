@@ -23,12 +23,12 @@ export const useWebRTC = (
   userMedia?: MediaStreamConstraints
 ) => {
   const [clients, setClients] = useStateWithCallback([]);
-  const mediaElements = useRef<any>({});
+  const mediaElements = useRef<{ [key: string]: any }>({});
   const connections = useRef<{ [key: string]: any }>({});
   const localMediaStream = useRef<MediaStream | null>(null);
   const pusher = useRef<PresenceChannel | null>(null);
   const emitPusher = useRef<Channel | null>(null);
-  const emit = async (action: any, ...args: any[]) => {
+  const emit = async (action: string, ...args: any[]) => {
     await fetch(`/api/pusher/${roomId}`, {
       method: "POST",
       headers: {
