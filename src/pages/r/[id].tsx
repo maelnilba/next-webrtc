@@ -156,11 +156,11 @@ const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
     <div
       className={`relative mt-2 flex w-[${
         props.ratio
-      }rem] justify-center overflow-hidden rounded-2xl border-4 border-${
-        props.isTalking ? "blue" : "slate"
-      }-500 shadow-${
-        props.isTalking ? "blue" : "slate"
-      }-500/90 bg-slate-500  shadow-2xl`}
+      }rem] justify-center overflow-hidden rounded-2xl ${
+        props.isTalking ? "border-2" : "border-0"
+      } border-yellow-500
+
+      bg-slate-500 shadow-lg  shadow-slate-500/50`}
     >
       <Spinner />
       <div className="z-10">
