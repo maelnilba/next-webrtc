@@ -65,6 +65,9 @@ export const useWebRTC = (
     vad({
       onVoiceStart,
       onVoiceStop,
+      // onUpdate: (val: any) => {
+      //   console.log("vad val:", val);
+      // },
     });
 
     const handleRelayTalking = ({
@@ -75,14 +78,14 @@ export const useWebRTC = (
       user: User;
     }) => {
       console.log("RELAY TALKING");
-      // setClients((list: any) =>
-      //   list.map((client: any) => {
-      //     return {
-      //       ...client,
-      //       isTalking: client.id === user.id ? isTalking : client?.isTalking,
-      //     };
-      //   })
-      // );
+      setClients((list: any) =>
+        list.map((client: any) => {
+          return {
+            ...client,
+            isTalking: client.id === user.id ? isTalking : client?.isTalking,
+          };
+        })
+      );
     };
     pusher.current?.bind(ACTIONS.RELAY_TALKING, handleRelayTalking);
     return () => {
@@ -212,7 +215,10 @@ export const useWebRTC = (
 
       // Add local track to remote connections
       localMediaStream.current?.getTracks().forEach((track) => {
-        connections.current[peerId].addTrack(track, localMediaStream.current);
+        (connections.current[peerId] as RTCPeerConnection).addTrack(
+          track,
+          localMediaStream.current!
+        );
       });
 
       // Create offer

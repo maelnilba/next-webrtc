@@ -4,3 +4,4 @@
 
 - [ ] Handle video + audio in same time
 - [ ] Think to a way of caching some data?
+- [ ] Might try to fix Safari issues

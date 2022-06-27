@@ -36,7 +36,7 @@ export function useVoiceDetector() {
   const voiceDetector = async (options: {
     onVoiceStart: () => void;
     onVoiceStop: () => void;
-    onUpdate?: () => void;
+    onUpdate?: (val: any) => void;
   }) => {
     let stream = null;
     if (!audioContext.current) {

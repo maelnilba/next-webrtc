@@ -181,6 +181,7 @@ const VideoRTC: React.FC<{ props: VideoRTCProps }> = ({ props }) => {
           width={`${props.ratio * 16}rem`}
           ref={videoRef}
           autoPlay
+          playsInline
         />
         {/* <audio ref={audioRef} autoPlay></audio> */}
       </div>
